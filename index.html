@@ -9,7 +9,7 @@
     <!-- 引入 Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Inter:wght@400;600;900&display=swap" rel="stylesheet">
     
     <!-- CSS 樣式 -->
     <style>
@@ -22,6 +22,8 @@
             --border-color: #dde8d4;
             --error-color: #D8000C;
             --error-bg-color: #FFD2D2;
+            --yellow-custom: #fbbf24;
+            --dark-blue-bg: #001f3f;
         }
 
         body {
@@ -38,7 +40,7 @@
             padding: 20px;
         }
 
-        /* 左下角即時資訊面板 (除錯用) */
+        /* 左下角即時資訊面板 */
         #system-monitor {
             position: fixed;
             bottom: 10px;
@@ -148,181 +150,114 @@
             border: none;
         }
 
-        /* 巢狀分類樣式 */
-        #category-container {
-            margin-bottom: 30px;
-        }
-        
-        .category-item {
-            margin-top: 5px;
+        /* GitHub 專案卡片樣式 */
+        #project-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
         }
 
-        .category-button {
-            padding: 12px 25px;
-            border: 2px solid var(--border-color);
-            background-color: #f8fbf6;
-            color: var(--secondary-color);
-            font-size: 1.1em;
-            font-weight: 700;
-            border-radius: 10px;
-            cursor: pointer;
+        .project-card {
+            background-color: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
             transition: all 0.3s ease;
-            width: 100%;
-            text-align: left;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            text-decoration: none;
+            display: block;
+            color: inherit;
         }
 
-        .category-button:hover {
-             background-color: #eef5e9;
-        }
-        
-        .category-button.active {
-            background-color: var(--primary-color);
-            color: white;
+        .project-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
             border-color: var(--primary-color);
         }
 
-        .category-button .arrow {
-            border: solid var(--secondary-color);
-            border-width: 0 3px 3px 0;
-            display: inline-block;
-            padding: 3px;
-            transform: rotate(45deg);
-            transition: transform 0.3s;
-        }
-        .category-button.active .arrow {
-             border-color: white;
-        }
-        .category-button.open .arrow {
-            transform: rotate(-135deg);
+        .card-content {
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
 
-        .subcategory-container {
-            display: none;
-            padding-left: 30px;
-            margin-left: 15px;
-            border-left: 2px solid #eef5e9;
-        }
-        
-        .subcategory-container.open {
-            display: block;
-        }
-
-        .tools-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 30px;
-            margin-top: 30px;
-        }
-        
-        /* Tool Card */
-        .tool-card {
-            background-color: var(--card-bg-color);
-            border: 1px solid #eef5e9;
-            border-radius: 15px;
+        .img-container {
+            width: 5rem;
+            height: 5rem;
+            flex-shrink: 0;
+            background: #f0f0f0;
+            border-radius: 0.75rem;
             overflow: hidden;
+            border: 1px solid #e5e7eb;
             display: flex;
-            flex-direction: column;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            align-items: center;
+            justify-content: center;
         }
 
-        .tool-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.09);
-        }
-        
-        .tool-card-image {
-            width: 100%;
-            height: auto;
-            background-color: #f0f0f0;
-            display: block;
-        }
-
-        .tool-card-content {
-            padding: 20px;
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .tool-card h3 {
-            margin-top: 0;
-            color: var(--primary-color);
-        }
-        
-        .tool-card p {
-            flex-grow: 1;
-            margin-bottom: 20px;
-        }
-
-        .tool-link {
-            display: inline-block;
-            align-self: flex-start;
-            padding: 10px 20px;
-            background-color: var(--secondary-color);
-            color: #ffffff;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: background-color 0.3s ease;
-        }
-
-        .tool-link:hover {
-            background-color: var(--primary-color);
-        }
-
-        /* Loading & Error */
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
+        .project-img {
             width: 100%;
             height: 100%;
-            background-color: rgba(255, 255, 255, 0.8);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            display: none;
+            object-fit: cover;
         }
 
-        .loading-spinner {
-            border: 8px solid #f3f3f3;
-            border-top: 8px solid var(--primary-color);
-            border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            animation: spin 1.5s linear infinite;
+        .img-fallback-text {
+            font-size: 0.7rem;
+            color: #9ca3af;
+            font-weight: bold;
+            text-align: center;
+            line-height: 1.2;
+            padding: 4px;
         }
 
-        .loading-overlay p {
-            margin-top: 20px;
-            font-size: 1.2em;
-            font-weight: 600;
+        .text-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .project-title {
+            font-size: 1.25rem;
+            font-weight: 700;
             color: var(--primary-color);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin: 0;
         }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .project-desc {
+            margin-top: 0.25rem;
+            font-size: 0.875rem;
+            color: #666;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
 
-        .error-message {
-            background-color: var(--error-bg-color);
-            color: var(--error-color);
-            border: 1px solid var(--error-color);
-            border-radius: 8px;
-            padding: 20px;
-            text-align: left;
+        .arrow-icon {
+            color: var(--secondary-color);
+            flex-shrink: 0;
         }
-        .error-message strong {
-            display: block;
-            margin-bottom: 10px;
+
+        #loading-indicator {
+            text-align: center;
+            padding: 3rem 0;
+            color: #666;
         }
         
+        .loading-spinner-small {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid #ccc;
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 0.5rem;
+        }
+
+
         /* 安全警告 Modal */
         .security-modal-overlay {
             position: fixed;
@@ -505,8 +440,8 @@
         <header>
             <div class="logo"><img src="https://lh3.googleusercontent.com/a/ACg8ocK0Sd79qNlGdQiGKEoKfuQxqHiVCHuyH4Sw5qFkJfpy4K_J23I=s288-c-no" alt="PandaPanda Logo"> PandaPanda的AI日常</div>
             <nav>
-                <a href="#" class="nav-link" data-page="about">關於本站</a>
-                <a href="#" class="nav-link" data-page="tools">自製網站</a>
+                <a href="#" class="nav-link active" data-page="about">關於本站</a>
+                <a href="#" class="nav-link" data-page="tools">自製</a>
                 <a href="https://m.youtube.com/@pandapanda%E7%9A%84AI%E6%97%A5%E5%B8%B8" target="_blank" rel="noopener noreferrer">YouTube頻道</a>
                 <a href="https://www.facebook.com/profile.php?id=61578859210871&locale=zh_TW" target="_blank" rel="noopener noreferrer">Facebook</a>
             </nav>
@@ -514,7 +449,7 @@
 
         <main>
             <!-- 區塊1: 網站介紹 (預設顯示) -->
-            <section id="about" class="page-section">
+            <section id="about" class="page-section active">
                 <h2>歡迎來到 PandaPanda 的 AI 世界</h2>
                 <p>
                     歡迎來到PandaPanda的AI日常<br>
@@ -528,16 +463,21 @@
 
             </section>
 
-            <!-- 區塊2: 自製網站 (預設隱藏) -->
+            <!-- 區塊2: 自製區 (預設隱藏) -->
             <section id="tools" class="page-section">
-                <h2>自製網站區</h2>
+                <h2>自製區</h2>
                 <p>
-                    請選擇一個分類，探索各種自製的有趣網站！
+                    請選擇一個專案，探索各種自製的有趣內容！
                 </p>
-                <!-- 巢狀分類將會動態插入到這裡 -->
-                <div id="category-container"></div>
-                <!-- 網站卡片將會動態插入到這裡 -->
-                <div id="tools-grid" class="tools-grid"></div>
+                
+                <!-- GitHub 專案列表容器 -->
+                <div id="project-list"></div>
+                
+                <!-- 載入指示器 -->
+                <div id="loading-indicator">
+                    <div class="loading-spinner-small"></div>
+                    <p>正在自動辨識目錄結構...</p>
+                </div>
             </section>
         </main>
 
@@ -546,81 +486,63 @@
             <div class="social-links">
                 <a href="https://m.youtube.com/@pandapanda%E7%9A%84AI%E6%97%A5%E5%B8%B8" target="_blank" rel="noopener noreferrer">YouTube頻道</a> | <a href="https://www.facebook.com/profile.php?id=61578859210871&locale=zh_TW" target="_blank" rel="noopener noreferrer">Facebook粉絲專頁</a>
             </div>
-            <p>版權所有 &copy; 2025 PandaPanda的AI日常 All Rights Reserved. </p>
+            <!-- 【修改】自動更新版權年份 -->
+            <p>版權所有 &copy; <span id="copyright-year"></span> <a href="https://pandapanda6666.github.io" style="color: inherit; text-decoration: none;">PandaPanda的AI日常</a> All Rights Reserved. </p>
         </footer>
     </div>
     
     <!-- JavaScript 程式碼 -->
     <script>
-        // --- 核心安全邏輯與監控 ---
+        // --- 核心安全邏輯與監控 (保留) ---
         (async function() {
-            // 1. 檢查是否已被永久封鎖
             if (localStorage.getItem('isPermanentlyBlocked')) {
                 redirectToGoogle();
                 return;
             }
 
-            // 2. 偵測 Brave 瀏覽器
             if (navigator.brave && await navigator.brave.isBrave()) {
                 permanentBlock('偵測到 Brave 瀏覽器');
                 return;
             }
 
-            // 3. 裝置類型與視窗監控
             const monitorEl = document.getElementById('system-monitor');
             
             function isMobileDevice() {
-                // 使用 User Agent 進行嚴格判斷
                 return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             }
 
             function updateMonitorAndCheckSecurity() {
-                const screenW = screen.availWidth;
-                const screenH = screen.availHeight;
+                const screenW = screen.width;
+                const screenH = screen.height;
                 const windowW = window.outerWidth;
                 const windowH = window.outerHeight;
+                const innerW = window.innerWidth;
+                const innerH = window.innerHeight;
                 const isMobile = isMobileDevice();
                 const type = isMobile ? '行動裝置' : '電腦';
 
-                // 更新顯示面板
                 if (monitorEl) {
-                    monitorEl.innerHTML = `螢幕(可用): ${screenW}x${screenH}\n視窗(外): ${windowW}x${windowH}\n類型: ${type}`;
-                    // 平板/手機顯示黃色，電腦顯示綠色
+                    monitorEl.innerHTML = `螢幕: ${screenW}x${screenH}\n視窗(外): ${windowW}x${windowH}\n視窗(內): ${innerW}x${innerH}\n類型: ${type}`;
                     monitorEl.style.color = isMobile ? '#ffff00' : '#00ff00';
                 }
 
-                // 【關鍵修正】只有當判定為「電腦」時，才執行視窗大小檢查
                 if (type === '電腦') {
-                    // 設定寬容度: 寬度 16px (邊框), 高度 150px (網址列/書籤列/工作列)
-                    const widthThreshold = 16;
-                    const heightThreshold = 150;
+                    const threshold = 200; 
+                    const widthDiff = windowW - innerW;
+                    const heightDiff = windowH - innerH;
 
-                    // 只檢查是否「小於」螢幕可用空間
-                    // 1900 < 1920-16 (1904) -> 觸發
-                    // 1040 < 1080-150 (930) -> 不觸發 (正常)
-                    
-                    const isWidthTooSmall = windowW < (screenW - widthThreshold);
-                    // 高度檢查放寬，通常不作為主要判斷依據，除非縮得非常小
-                    // 這裡我們主要依據您的需求：1920*1080 vs 1900*1040 (寬度變小)
-                    
-                    if (isWidthTooSmall) {
-                        const details = `視窗寬度不足 (電腦模式)\n(螢幕寬: ${screenW} vs 視窗寬: ${windowW})`;
-                        permanentBlock('視窗未最大化', details);
+                    if (widthDiff > threshold || heightDiff > threshold) {
+                         const details = `偵測到內容空間異常\n(外寬: ${windowW} - 內寬: ${innerW} = ${widthDiff})`;
+                        permanentBlock('偵測到開發者工具 (面板佔用空間)', details);
                     }
                 }
             }
 
-            // 初始執行與事件監聽
-            // 延遲一下讓瀏覽器準備好
-            setTimeout(() => {
-                window.addEventListener('resize', updateMonitorAndCheckSecurity);
-                updateMonitorAndCheckSecurity();
-            }, 1500);
+            window.addEventListener('load', updateMonitorAndCheckSecurity);
+            window.addEventListener('resize', updateMonitorAndCheckSecurity);
             
-            // --- 輔助函式 ---
             function permanentBlock(reason, details = '') {
                 localStorage.setItem('isPermanentlyBlocked', 'true');
-                
                 const blockOverlay = document.getElementById('block-overlay');
                 const blockDetails = document.getElementById('block-details');
                 if (blockOverlay) {
@@ -631,8 +553,6 @@
                     document.querySelector('.container').style.display = 'none';
                     document.body.style.overflow = 'hidden';
                 }
-                
-                // 立即重新導向
                 window.location.href = 'https://www.google.com/';
             }
             
@@ -641,9 +561,11 @@
             }
         })();
 
-        // --- 原有的安全與主程式碼 ---
         document.addEventListener('DOMContentLoaded', function() {
-            // --- 安全功能 (警告、鎖定) ---
+            // --- 【新增】自動更新版權年份 ---
+            document.getElementById('copyright-year').textContent = new Date().getFullYear();
+
+            // --- 安全功能 (警告、鎖定) (保留) ---
             const securityModal = document.getElementById('security-modal');
             const closeSecurityModalBtn = document.getElementById('close-security-modal');
             const finalWarningOverlay = document.getElementById('final-warning-overlay');
@@ -660,28 +582,25 @@
                 }
                 lastWarningTime = now;
 
-                // 第二層防護：終極警告
                 if (warningCount >= 3) {
                     finalWarningOverlay.style.display = 'flex';
                     document.body.style.overflow = 'hidden';
                     
-                    // 立即觸發懲罰與重新導向
-                    let ultimateCount = parseInt(localStorage.getItem('ultimateWarningCount') || '0') + 1;
-                    localStorage.setItem('ultimateWarningCount', ultimateCount);
+                    setTimeout(() => {
+                        let ultimateCount = parseInt(localStorage.getItem('ultimateWarningCount') || '0') + 1;
+                        localStorage.setItem('ultimateWarningCount', ultimateCount);
 
-                    if (ultimateCount >= 3) {
-                        localStorage.setItem('lockoutUntil', Date.now() + 3600000); // 1小時
-                        localStorage.removeItem('ultimateWarningCount');
-                    } else {
-                        localStorage.setItem('lockoutUntil', Date.now() + 60000); // 60秒
-                    }
-                    
-                    // 不等待，直接導向
-                    window.location.href = 'https://www.google.com/';
+                        if (ultimateCount >= 3) {
+                            localStorage.setItem('lockoutUntil', Date.now() + 3600000); 
+                            localStorage.removeItem('ultimateWarningCount');
+                        } else {
+                            localStorage.setItem('lockoutUntil', Date.now() + 60000); 
+                        }
+                        window.location.reload();
+                    }, 3000);
                     return;
                 }
 
-                // 第一層防護：彈出視窗
                 if (securityModal.style.display === 'flex') return;
                 securityModal.style.display = 'flex';
                 closeSecurityModalBtn.disabled = true;
@@ -715,164 +634,162 @@
             });
             document.addEventListener('contextmenu', event => event.preventDefault());
 
-            // --- 網站主要功能 ---
-            const sheetId = "2PACX-1vQCTWbsAW4dgDJKZ_PpraMgQ0z9iRL1qGZCcPVGZWsmk1KZHqQWfqps5z-xWwxS_g";
-            const baseCsvUrl = `https://docs.google.com/spreadsheets/d/e/${sheetId}/pub?single=true&output=csv`;
-            const navLinks = document.querySelectorAll('nav a.nav-link');
-            const pageSections = document.querySelectorAll('.page-section');
-            const toolsGrid = document.getElementById('tools-grid');
-            const loadingOverlay = document.getElementById('loading-overlay');
-            const dataCache = {};
-            let toolsLoaded = false;
+
+            // --- GitHub API 專案載入邏輯 ---
             
+            const loadingOverlay = document.getElementById('loading-overlay');
             function showLoader() { loadingOverlay.style.display = 'flex'; }
             function hideLoader() { loadingOverlay.style.display = 'none'; }
+            
+            setTimeout(hideLoader, 500);
 
-            function parseCSV(text) {
-                const lines = text.trim().split('\n');
-                if (lines.length === 0) return { headers: [], data: [] };
-                const headers = lines[0].split(',').map(h => h.trim());
-                if (lines.length < 2) return { headers: headers, data: [] };
-                
-                const data = [];
-                for (let i = 1; i < lines.length; i++) {
-                    const row = lines[i].trim();
-                    if (row === '') continue;
-                    const values = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-                    const obj = {};
-                    headers.forEach((header, index) => {
-                        if (values[index]) {
-                            let value = values[index].trim();
-                            if (value.startsWith('"') && value.endsWith('"')) value = value.substring(1, value.length - 1).replace(/""/g, '"');
-                            obj[header] = value;
-                        } else {
-                            obj[header] = '';
-                        }
-                    });
-                    data.push(obj);
+            function getAbsoluteUrl(relativePath) {
+                try {
+                    let base = window.location.href;
+                    if (!base.endsWith('/') && !base.includes('.html')) base += '/';
+                    base = base.replace(/\/index\.html$/, '/');
+                    return new URL(relativePath, base).href;
+                } catch (e) {
+                    return relativePath;
                 }
-                return { headers, data };
             }
 
-            function displayError(container, message, suggestion) {
-                console.error(message);
-                container.innerHTML = `<div class="error-message"><strong>讀取資料時發生錯誤：</strong><p>${message}</p><p>${suggestion || '請檢查您的 Google Sheet 設定或網路連線。'}</p></div>`;
+            window.handleImageError = function(img, projectUrl) {
+                const previewUrl = `https://s.wordpress.com/mshots/v1/${encodeURIComponent(projectUrl)}?w=400`;
+                if (img.src !== previewUrl) {
+                    img.src = previewUrl;
+                } else {
+                    img.parentElement.innerHTML = `<div class="img-fallback-text">載入預覽中</div>`;
+                }
             }
 
-            function renderTools(tools) {
-                toolsGrid.innerHTML = '';
-                if (!tools || tools.length === 0) {
-                    toolsGrid.innerHTML = '<p>這個分類下沒有找到任何網站。</p>';
+            async function getRepoInfo() {
+                const hostname = window.location.hostname;
+                const pathname = window.location.pathname;
+                
+                if (!hostname.includes('github.io')) {
+                     return { user: 'pandapanda6666', repo: 'pandapanda6666.github.io', subPath: '' };
+                }
+
+                const user = hostname.split('.')[0];
+                const cleanPath = pathname.replace(/\/index\.html$/, '').replace(/\/$/, '');
+                const pathParts = cleanPath.split('/').filter(p => p !== '');
+
+                if (pathParts.length === 0) {
+                    return { user, repo: `${user}.github.io`, subPath: '' };
+                }
+
+                return { user, repo: `${user}.github.io`, subPath: '' };
+            }
+
+            async function scanAndLoadFolders() {
+                const container = document.getElementById('project-list');
+                const loadingIndicator = document.getElementById('loading-indicator');
+                const repoInfo = await getRepoInfo();
+                
+                if (!repoInfo) {
+                    loadingIndicator.innerHTML = `<p style="color:red;">讀取目錄失敗</p>`;
                     return;
                 }
-                tools.forEach(tool => {
-                    const name = tool['名稱'] || '無標題';
-                    const description = tool['說明'] || '無描述';
-                    const link = tool['連結'] || '#';
-                    const imageUrl = tool['圖片連結'] || 'https://placehold.co/600x400/eef5e9/7b9c81?text=No Image';
-                    const card = document.createElement('div');
-                    card.className = 'tool-card';
-                    card.innerHTML = `<img src="${imageUrl}" alt="${name}" class="tool-card-image" onerror="this.onerror=null;this.src='https://placehold.co/600x400/eef5e9/7b9c81?text=Image+Error';"><div class="tool-card-content"><h3>${name}</h3><p>${description}</p><a href="${link}" class="tool-link" target="_blank" rel="noopener noreferrer">前往使用</a></div>`;
-                    toolsGrid.appendChild(card);
-                });
-            }
 
-            async function renderCategoryLevel(gid, parentElement) {
-                parentElement.innerHTML = '';
-                showLoader();
                 try {
-                    if (dataCache[gid]) {
-                        processData(dataCache[gid], parentElement);
-                    } else {
-                        const response = await fetch(`${baseCsvUrl}&gid=${gid}`);
-                        if (!response.ok) throw new Error(`無法載入工作表 (GID: ${gid})。`);
-                        const csvText = await response.text();
-                        if (csvText.trim().startsWith('<!DOCTYPE html>')) throw new Error("資料格式不正確，可能需重新發佈。");
-                        const parsedResult = parseCSV(csvText);
-                        dataCache[gid] = parsedResult;
-                        processData(parsedResult, parentElement);
+                    const apiUrl = `https://api.github.com/repos/${repoInfo.user}/${repoInfo.repo}/contents/${repoInfo.subPath}`;
+                    const response = await fetch(apiUrl);
+                    
+                    if (!response.ok) {
+                        if (response.status === 403) throw new Error("GitHub API 達到上限，請稍候");
+                        throw new Error("讀取目錄失敗");
                     }
+
+                    const contents = await response.json();
+                    const directories = contents.filter(item => item.type === 'dir' && !item.name.startsWith('.'));
+
+                    let hasContent = false;
+                    container.innerHTML = ''; 
+
+                    for (const item of directories) {
+                        try {
+                            const folder = item.name;
+                            const projectUrl = getAbsoluteUrl(`./${folder}/`);
+                            const readmeUrl = getAbsoluteUrl(`./${folder}/README.md`);
+                            const iconUrl = getAbsoluteUrl(`./${folder}/icon.png`);
+                            
+                            const readmeRes = await fetch(readmeUrl);
+                            if (!readmeRes.ok) continue; 
+
+                            const text = await readmeRes.text();
+                            const lines = text.split('\n').map(l => l.trim()).filter(l => l !== '');
+                            if (lines.length === 0) continue;
+
+                            hasContent = true;
+                            const name = lines[0].replace(/^#\s*/, '').trim();
+                            const desc = lines.length > 1 ? lines[1].trim() : "無說明文字";
+
+                            const cardHTML = `
+                                <a href="${projectUrl}" class="project-card">
+                                    <div class="card-content">
+                                        <div class="img-container">
+                                            <img src="${iconUrl}" alt="${name}" class="project-img" 
+                                                 onerror="handleImageError(this, '${projectUrl}')">
+                                        </div>
+                                        <div class="text-content">
+                                            <h3 class="project-title">${name}</h3>
+                                            <p class="project-desc">${desc}</p>
+                                        </div>
+                                        <div class="arrow-icon">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </a>
+                            `;
+                            
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = cardHTML.trim();
+                            container.appendChild(tempDiv.firstChild);
+
+                        } catch (e) {
+                            console.warn("Skipping folder:", item.name, e);
+                        }
+                    }
+
+                    loadingIndicator.style.display = 'none';
+                    if (!hasContent) container.innerHTML = `<div style="grid-column: 1/-1; text-align:center; color:#999;">目前沒有可顯示的項目</div>`;
+
                 } catch (error) {
-                    displayError(parentElement, error.message, "請檢查 Google Sheet 設定。");
-                } finally {
-                    hideLoader();
+                    loadingIndicator.innerHTML = `<p style="color: #ff6b6b;">${error.message}</p>`;
                 }
             }
-            
-            function processData(parsedResult, parentElement) {
-                const { headers, data } = parsedResult;
-                const isCategoryPage = headers.includes('分類') && headers.includes('gid') && headers.includes('是否有資料夾');
-                const isToolsPage = headers.includes('名稱') && headers.includes('連結');
 
-                if (isCategoryPage) {
-                    toolsGrid.innerHTML = '';
-                    const categories = data.filter(item => item['分類'] && item['gid']);
-                    if (categories.length === 0) {
-                        parentElement.innerHTML = '<p>這個分類下沒有子分類。</p>';
-                        return;
-                    }
-                    categories.forEach(cat => {
-                        const { '分類': catName, gid: catGid, '是否有資料夾': hasFoldersStr } = cat;
-                        const hasFolders = hasFoldersStr === '1';
 
-                        const item = document.createElement('div');
-                        item.className = 'category-item';
-                        const button = document.createElement('button');
-                        button.className = 'category-button';
-                        button.innerHTML = `<i class="arrow"></i> <span>${catName}</span>`;
-                        const subContainer = document.createElement('div');
-                        subContainer.className = 'subcategory-container';
-                        item.append(button, subContainer);
-                        
-                        button.addEventListener('click', () => {
-                            const isCurrentlyActive = button.classList.contains('active');
-                            button.classList.toggle('open');
-                            if (hasFolders) {
-                                subContainer.classList.toggle('open');
-                                if (subContainer.classList.contains('open') && subContainer.innerHTML === '') {
-                                    renderCategoryLevel(catGid, subContainer);
-                                }
-                            } else {
-                                document.querySelectorAll('#category-container .category-button.active').forEach(b => {
-                                    if (b !== button) b.classList.remove('active');
-                                });
-                                button.classList.toggle('active', !isCurrentlyActive);
-                                if (!isCurrentlyActive) {
-                                    renderCategoryLevel(catGid, toolsGrid);
-                                } else {
-                                    toolsGrid.innerHTML = '';
-                                }
-                            }
-                        });
-                        parentElement.appendChild(item);
-                    });
-                } else if (isToolsPage) {
-                    renderTools(data);
-                } else {
-                    const detectedHeaders = headers.join(', ') || '無';
-                    throw new Error(`工作表格式無法識別。偵測到的欄位為：「${detectedHeaders}」。`);
-                }
-            }
-            
-            // --- 程式進入點 ---
+            // --- 頁面導覽邏輯 ---
+            const navLinks = document.querySelectorAll('nav a.nav-link');
+            const pageSections = document.querySelectorAll('.page-section');
+            let projectsLoaded = false;
+
             navLinks.forEach(link => {
                 link.addEventListener('click', function(event) {
                     event.preventDefault();
                     const pageId = this.dataset.page;
+                    
                     navLinks.forEach(l => l.classList.remove('active'));
                     this.classList.add('active');
+
                     pageSections.forEach(section => {
                         section.classList.toggle('active', section.id === pageId);
                     });
-                    if (pageId === 'tools' && !toolsLoaded) {
-                        renderCategoryLevel('1860425358', document.getElementById('category-container'));
-                        toolsLoaded = true;
+                    
+                    if (pageId === 'tools' && !projectsLoaded) {
+                        scanAndLoadFolders();
+                        projectsLoaded = true;
                     }
                 });
             });
-            
-            navLinks[0].click();
         });
     </script>
+
+    <!-- 重新嵌入隱藏的警告頁面 -->
+    <iframe src="./warning.html" style="display: none;" title="安全警告"></iframe>
 </body>
 </html>
