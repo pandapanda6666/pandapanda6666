@@ -486,7 +486,6 @@
             <div class="social-links">
                 <a href="https://m.youtube.com/@pandapanda%E7%9A%84AI%E6%97%A5%E5%B8%B8" target="_blank" rel="noopener noreferrer">YouTube頻道</a> | <a href="https://www.facebook.com/profile.php?id=61578859210871&locale=zh_TW" target="_blank" rel="noopener noreferrer">Facebook粉絲專頁</a>
             </div>
-            <!-- 【修改】自動更新版權年份 -->
             <p>版權所有 &copy; <span id="copyright-year"></span> <a href="https://pandapanda6666.github.io" style="color: inherit; text-decoration: none;">PandaPanda的AI日常</a> All Rights Reserved. </p>
         </footer>
     </div>
@@ -562,7 +561,7 @@
         })();
 
         document.addEventListener('DOMContentLoaded', function() {
-            // --- 【新增】自動更新版權年份 ---
+            // --- 自動更新版權年份 ---
             document.getElementById('copyright-year').textContent = new Date().getFullYear();
 
             // --- 安全功能 (警告、鎖定) (保留) ---
@@ -663,23 +662,9 @@
                 }
             }
 
+            // 【修改】指定目標儲存庫為 pandapanda6666
             async function getRepoInfo() {
-                const hostname = window.location.hostname;
-                const pathname = window.location.pathname;
-                
-                if (!hostname.includes('github.io')) {
-                     return { user: 'pandapanda6666', repo: 'pandapanda6666.github.io', subPath: '' };
-                }
-
-                const user = hostname.split('.')[0];
-                const cleanPath = pathname.replace(/\/index\.html$/, '').replace(/\/$/, '');
-                const pathParts = cleanPath.split('/').filter(p => p !== '');
-
-                if (pathParts.length === 0) {
-                    return { user, repo: `${user}.github.io`, subPath: '' };
-                }
-
-                return { user, repo: `${user}.github.io`, subPath: '' };
+                return { user: 'pandapanda6666', repo: 'pandapanda6666', subPath: '' };
             }
 
             async function scanAndLoadFolders() {
