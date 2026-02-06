@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>多功能計時、計分與錄影系統</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+    <!-- 引入 JSZip 函式庫用於打包 ZIP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         * { box-sizing: border-box; }
@@ -58,9 +60,20 @@
         body.theme-original #display, body.theme-original #modalDisplay { font-family: 'Courier New', monospace; color: #0f172a; text-shadow: none; }
         body.theme-original .mode-select { color: #1e293b; background: white; border: 1px solid #cbd5e1; }
 
+        /* 專業/簡易模式隱藏邏輯 */
         body.mode-simple .pro-only { display: none !important; }
         body.mode-simple .main-grid { grid-template-columns: 1fr !important; }
         body.mode-simple .main-container { max-width: 800px !important; }
+
+        /* 純碼表模式邏輯 */
+        body.mode-pure .pro-only, 
+        body.mode-pure #monitorWrapper, 
+        body.mode-pure #lapListContainer,
+        body.mode-pure #displayQuickSettings,
+        body.mode-pure #lapBtn,
+        body.mode-pure #recManualButtons { display: none !important; }
+        body.mode-pure .main-grid { grid-template-columns: 1fr !important; }
+        body.mode-pure .main-container { max-width: 900px !important; }
 
         .finished { animation: pulse 1s infinite; color: #ef4444 !important; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
@@ -124,11 +137,36 @@
             background: rgba(239, 68, 68, 0.2);
         }
 
-        #startupModal { display: flex; }
+        /* 模擬全螢幕樣式 (模擬 requestFullscreen 以避開 Permissions Policy) */
+        .simulated-fs {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            background: #000 !important;
+            z-index: 9999 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: center !important;
+            margin: 0 !important;
+            padding: 20px !important;
+        }
+        .simulated-fs #display {
+            font-size: 18vw !important;
+            margin-bottom: 2rem !important;
+        }
+        .simulated-fs .hide-in-fs {
+            display: none !important;
+        }
+        #exitFullscreenBtn { display: none; }
+        .simulated-fs #exitFullscreenBtn { display: block; }
     </style>
 </head>
 <body class="theme-scifi mode-simple">
 
+    <!-- 啟動強制輸入名稱遮罩 -->
     <div id="startupModal" class="modal-overlay">
         <div class="card p-8 rounded-3xl max-w-sm w-full flex flex-col items-center shadow-2xl bg-slate-900 border border-blue-500">
             <h2 class="text-xl font-bold mb-4 text-blue-400">請設定名稱</h2>
@@ -138,12 +176,14 @@
         </div>
     </div>
 
-    <div class="top-controls">
+    <!-- 頂部控制項 -->
+    <div class="top-controls hide-in-fs">
         <div class="card p-2 flex items-center gap-2 shadow-lg">
             <label class="text-xs font-bold text-slate-500">模式：</label>
             <select id="modeSelect" onchange="toggleUIMode(this.value)" class="mode-select rounded px-1 outline-none text-sm">
                 <option value="mode-simple" selected>簡易模式</option>
                 <option value="mode-pro">專業模式</option>
+                <option value="mode-pure">純碼表模式</option>
             </select>
         </div>
         <div class="card p-2 flex items-center gap-2 shadow-lg">
@@ -156,181 +196,182 @@
     </div>
 
     <div class="main-container max-w-[1400px] w-full flex flex-col items-center gap-6 mt-10 mb-20 transition-all">
-        <div class="text-center">
-            <h1 id="mainTitle" contenteditable="true" class="header-title text-4xl md:text-5xl font-black px-4 py-2 transition-all cursor-text mb-2 inline-block"></h1>
-        </div>
-
-        <div class="main-grid grid grid-cols-1 lg:grid-cols-12 gap-6 w-full transition-all">
+        
+        <!-- 全螢幕切換容器 -->
+        <div id="mainTimerContainer" class="w-full flex flex-col items-center transition-all">
             
-            <div class="lg:col-span-3 flex flex-col gap-6 pro-only">
-                <div class="card rounded-3xl p-5 flex flex-col gap-3">
-                    <h2 class="text-md font-bold text-blue-400 border-b border-slate-700/50 pb-2 uppercase text-sm">配置版本</h2>
-                    <div class="flex gap-2">
-                        <input type="text" id="newConfigName" placeholder="新配置名" class="score-input flex-grow p-2 rounded text-xs outline-none text-white bg-slate-800">
-                        <button onclick="saveCurrentConfig()" class="bg-blue-600 hover:bg-blue-500 text-white px-3 rounded text-xs font-bold transition-colors">儲存</button>
-                    </div>
-                    <div id="configList" class="flex flex-col gap-2 max-h-32 overflow-y-auto custom-scrollbar"></div>
-                </div>
+            <div class="text-center">
+                <h1 id="mainTitle" contenteditable="true" class="header-title text-4xl md:text-5xl font-black px-4 py-2 transition-all cursor-text mb-2 inline-block"></h1>
+            </div>
 
-                <div class="card rounded-3xl p-5 flex flex-col gap-3">
-                    <div class="flex justify-between items-center">
-                        <h2 class="text-md font-bold text-blue-400 text-sm uppercase">計分板</h2>
-                        <button onclick="addPlayer()" class="text-[10px] bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded transition-colors">新增選手</button>
-                    </div>
-                    <div id="scoreboard" class="flex flex-col gap-2 max-h-64 overflow-y-auto custom-scrollbar"></div>
-                </div>
-
-                <div class="card rounded-3xl p-5 flex flex-col gap-3">
-                    <h2 class="text-md font-bold text-red-400 text-sm uppercase">倒數計時清單</h2>
-                    <div class="flex flex-col gap-2">
-                        <div class="flex items-center gap-1">
-                            <input type="number" id="inputMinutes" value="1" min="0" class="score-input w-full p-2 rounded text-center text-xs text-white bg-slate-800" placeholder="分">
-                            <input type="number" id="inputSeconds" value="0" min="0" max="59" class="score-input w-full p-2 rounded text-center text-xs text-white bg-slate-800" placeholder="秒">
-                            <button onclick="addCountdownPreset()" class="bg-red-600 text-white px-3 py-2 rounded text-xs font-bold">+</button>
+            <div class="main-grid grid grid-cols-1 lg:grid-cols-12 gap-6 w-full transition-all">
+                
+                <div class="lg:col-span-3 flex flex-col gap-6 pro-only hide-in-fs">
+                    <div class="card rounded-3xl p-5 flex flex-col gap-3">
+                        <h2 class="text-md font-bold text-blue-400 border-b border-slate-700/50 pb-2 uppercase text-sm">配置版本</h2>
+                        <div class="flex gap-2">
+                            <input type="text" id="newConfigName" placeholder="新配置名" class="score-input flex-grow p-2 rounded text-xs outline-none text-white bg-slate-800">
+                            <button onclick="saveCurrentConfig()" class="bg-blue-600 hover:bg-blue-500 text-white px-3 rounded text-xs font-bold transition-colors">儲存</button>
                         </div>
-                        <div class="flex flex-col gap-1 mt-1">
-                            <div class="flex items-center gap-2">
-                                <label class="switch"><input type="checkbox" id="autoStopAtZero" checked><span class="slider"></span></label>
-                                <span class="text-[10px] opacity-70">時間到自動停止</span>
+                        <div id="configList" class="flex flex-col gap-2 max-h-32 overflow-y-auto custom-scrollbar"></div>
+                    </div>
+
+                    <div class="card rounded-3xl p-5 flex flex-col gap-3">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-md font-bold text-blue-400 text-sm uppercase">計分板</h2>
+                            <button onclick="addPlayer()" class="text-[10px] bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded transition-colors">新增選手</button>
+                        </div>
+                        <div id="scoreboard" class="flex flex-col gap-2 max-h-64 overflow-y-auto custom-scrollbar"></div>
+                    </div>
+
+                    <div class="card rounded-3xl p-5 flex flex-col gap-3">
+                        <h2 class="text-md font-bold text-red-400 text-sm uppercase">倒數計時清單</h2>
+                        <div class="flex flex-col gap-2">
+                            <div class="flex items-center gap-1">
+                                <input type="number" id="inputMinutes" value="1" min="0" class="score-input w-full p-2 rounded text-center text-xs text-white bg-slate-800" placeholder="分">
+                                <input type="number" id="inputSeconds" value="0" min="0" max="59" class="score-input w-full p-2 rounded text-center text-xs text-white bg-slate-800" placeholder="秒">
+                                <button onclick="addCountdownPreset()" class="bg-red-600 text-white px-3 py-2 rounded text-xs font-bold">+</button>
                             </div>
-                            <div class="flex items-center gap-2 mt-1">
-                                <span class="text-[9px] opacity-60">停止行為：</span>
-                                <select id="stopBehavior" class="bg-slate-700 p-1 rounded text-[9px] text-white outline-none">
-                                    <option value="stopwatch">僅碼表</option>
-                                    <option value="everything" selected>全部 (含錄影)</option>
+                            <div class="flex flex-col gap-1 mt-1">
+                                <div class="flex items-center gap-2">
+                                    <label class="switch"><input type="checkbox" id="autoStopAtZero" checked><span class="slider"></span></label>
+                                    <span class="text-[10px] opacity-70">時間到自動停止</span>
+                                </div>
+                            </div>
+                            <div id="countdownPresetsList" class="flex flex-col gap-2 mt-2 max-h-40 overflow-y-auto custom-scrollbar"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-6 flex flex-col gap-6">
+                    <div class="card rounded-3xl p-6 flex flex-col items-center min-h-[500px] relative">
+                        <div id="monitorWrapper" class="shadow-2xl mb-6 relative border-slate-700 hide-in-fs">
+                            <div id="recordingStatus" class="absolute top-3 left-3 bg-black/60 px-3 py-1 rounded-full text-[10px] font-bold hidden flex items-center text-white z-10 border border-red-500/50">
+                                <span class="recording-dot"></span> REC
+                            </div>
+                            <button onclick="switchCamera()" class="absolute top-3 right-3 bg-white/10 hover:bg-white/30 p-2 rounded-full text-white z-10 border border-white/20">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                            </button>
+                            <canvas id="recordCanvas"></canvas>
+                            <video id="videoPreview" autoplay muted playsinline></video>
+                        </div>
+
+                        <div class="w-full flex flex-col items-center relative">
+                            <div id="display" class="text-6xl md:text-7xl font-bold mb-8 text-white transition-all">
+                                <span class="digit">0</span><span class="digit">0</span>
+                                <span class="separator">:</span>
+                                <span class="digit">0</span><span class="digit">0</span>
+                                <span class="separator">.</span>
+                                <span class="digit">0</span><span class="digit">0</span><span class="digit">0</span>
+                            </div>
+                            <div class="absolute -top-4 -right-4 non-fs hide-in-fs">
+                                <button onclick="enterPureTimerFullscreen()" class="p-2 bg-slate-800/50 hover:bg-blue-600 rounded-full text-white transition-all shadow-lg" title="模擬全螢幕">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" /></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="w-full flex flex-col gap-4">
+                            <div id="controlLayout" class="flex flex-col gap-4 items-center w-full">
+                                <div id="operationalButtons" class="flex flex-col gap-4 w-full items-center">
+                                    <div class="flex flex-wrap justify-center gap-3 w-full border-b border-slate-700/30 pb-4">
+                                        <button id="timerStartBtn" onclick="toggleTimer()" class="bg-green-600 hover:bg-green-500 text-white px-8 py-3 rounded-xl font-bold transition-all active:scale-95 shadow-lg min-w-[120px]">開始</button>
+                                        <button id="lapBtn" onclick="recordLap()" class="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl font-bold transition-all active:scale-95 shadow-lg min-w-[120px] pro-only hide-in-fs">分圈</button>
+                                        <button id="resetBtn" onclick="resetTimer()" class="bg-slate-500 hover:bg-slate-400 text-white px-8 py-3 rounded-xl font-bold transition-all active:scale-95 shadow-lg">歸零</button>
+                                    </div>
+                                    <div id="recManualButtons" class="flex flex-wrap justify-center gap-3 w-full hide-in-fs">
+                                        <button id="recStartBtn" onclick="startRecording()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-2 rounded-xl font-bold shadow-lg disabled:opacity-30">啟動錄影</button>
+                                        <button id="recStopBtn" onclick="stopRecording()" disabled class="bg-red-600 hover:bg-red-500 text-white px-8 py-2 rounded-xl font-bold shadow-lg disabled:opacity-30">停止錄影</button>
+                                    </div>
+                                </div>
+
+                                <div id="syncControls" class="hidden flex flex-wrap justify-center gap-4 w-full hide-in-fs">
+                                    <button id="syncStartBtn" onclick="syncStart()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-10 py-4 rounded-xl font-bold text-lg shadow-lg min-w-[200px] disabled:opacity-30">同步開始</button>
+                                    <button id="syncStopBtn" onclick="syncStop()" disabled class="bg-red-600 hover:bg-red-500 text-white px-10 py-4 rounded-xl font-bold text-lg shadow-lg min-w-[200px] disabled:opacity-30">停止儲存</button>
+                                </div>
+
+                                <div id="displayQuickSettings" class="mt-2 flex flex-wrap justify-center items-center gap-4 transition-all hide-in-fs">
+                                    <div id="simpleDisplayConfig" class="flex items-center gap-2">
+                                        <span class="text-xs opacity-60">顯示模式：</span>
+                                        <select id="sw_mode_simple" onchange="syncSwMode(this.value)" class="bg-slate-700/50 p-1 rounded text-[10px] text-white border border-slate-600 outline-none">
+                                            <option value="always" selected>永遠顯示</option>
+                                            <option value="before">開始前顯示</option>
+                                            <option value="after">結束後顯示</option>
+                                            <option value="never">隱藏</option>
+                                        </select>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <label class="switch"><input type="checkbox" id="syncModeToggle" onchange="toggleSyncMode()"><span class="slider"></span></label>
+                                        <span class="text-xs opacity-60">同步錄製模式</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <label class="switch"><input type="checkbox" id="dupProtectionToggle" checked onchange="syncDupMode(this.checked)"><span class="slider"></span></label>
+                                        <span class="text-xs opacity-60">重複保護 (自動編號)</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="lapListContainer" class="w-full mt-6 max-h-32 overflow-y-auto custom-scrollbar border-t border-slate-700/30 pt-4 hidden pro-only hide-in-fs">
+                            <table class="w-full text-center text-[11px] font-mono text-white">
+                                <tbody id="lapTableBody"></tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- 退出全螢幕按鈕 -->
+                        <button id="exitFullscreenBtn" onclick="exitPureTimerFullscreen()" class="fixed top-8 right-8 p-3 bg-red-600/50 hover:bg-red-600 text-white rounded-xl font-bold transition-all z-[1000]">退出全螢幕</button>
+                    </div>
+
+                    <div class="card rounded-3xl p-5 flex flex-col w-full hide-in-fs">
+                        <h2 class="text-sm font-bold mb-3 flex items-center gap-2 text-blue-400 uppercase">歷史紀錄</h2>
+                        <div id="recordList" class="overflow-y-auto custom-scrollbar space-y-3 max-h-[400px]">
+                            <div class="text-center py-4 opacity-30 italic text-[10px] text-white">尚無紀錄</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-3 flex flex-col gap-6 pro-only hide-in-fs">
+                    <div class="card rounded-3xl p-5 flex flex-col gap-3 text-[11px] overflow-y-auto max-h-[850px] custom-scrollbar">
+                        <h2 class="text-sm font-bold text-blue-400 border-b border-slate-700/50 pb-2 uppercase">影像合成設定</h2>
+                        <div class="config-section">
+                            <span class="config-label text-blue-400">錄製設定 (同步修改)</span>
+                            <div class="flex flex-col gap-2">
+                                <div class="flex items-center gap-3">
+                                    <label class="switch"><input type="checkbox" id="syncModeTogglePro" onchange="syncSyncMode(this.checked)"><span class="slider"></span></label>
+                                    <span>同步錄製模式</span>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <label class="switch"><input type="checkbox" id="dupProtectionTogglePro" checked onchange="syncDupMode(this.checked)"><span class="slider"></span></label>
+                                    <span>重複保護 (自動編號)</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-section">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="config-label text-blue-400">碼表 (加數)</span>
+                                <select id="sw_mode" onchange="syncSwMode(this.value)" class="bg-slate-700 p-1 rounded text-[9px] text-white">
+                                    <option value="always" selected>永遠顯示</option>
+                                    <option value="before">開始前</option>
+                                    <option value="after">結束後</option>
+                                    <option value="never">不顯示</option>
                                 </select>
                             </div>
-                        </div>
-                        <div id="countdownPresetsList" class="flex flex-col gap-2 mt-2 max-h-40 overflow-y-auto custom-scrollbar"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="lg:col-span-6 flex flex-col gap-6">
-                <div class="card rounded-3xl p-6 flex flex-col items-center min-h-[500px]">
-                    <div id="monitorWrapper" class="shadow-2xl mb-6 relative border-slate-700">
-                        <div id="recordingStatus" class="absolute top-3 left-3 bg-black/60 px-3 py-1 rounded-full text-[10px] font-bold hidden flex items-center text-white z-10 border border-red-500/50">
-                            <span class="recording-dot"></span> REC
-                        </div>
-                        <button onclick="switchCamera()" class="absolute top-3 right-3 bg-white/10 hover:bg-white/30 p-2 rounded-full text-white z-10 border border-white/20">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                        </button>
-                        <canvas id="recordCanvas"></canvas>
-                        <video id="videoPreview" autoplay muted playsinline></video>
-                    </div>
-
-                    <div id="display" class="text-6xl md:text-7xl font-bold mb-8 text-white">
-                        <span class="digit">0</span><span class="digit">0</span>
-                        <span class="separator">:</span>
-                        <span class="digit">0</span><span class="digit">0</span>
-                        <span class="separator">.</span>
-                        <span class="digit">0</span><span class="digit">0</span><span class="digit">0</span>
-                    </div>
-
-                    <div class="w-full flex flex-col gap-4">
-                        <div id="controlLayout" class="flex flex-col gap-4 items-center w-full">
-                            <!-- 操作按鈕區 -->
-                            <div id="operationalButtons" class="flex flex-col gap-4 w-full items-center">
-                                <div class="flex flex-wrap justify-center gap-3 w-full border-b border-slate-700/30 pb-4">
-                                    <button id="timerStartBtn" onclick="toggleTimer()" class="bg-green-600 hover:bg-green-500 text-white px-8 py-3 rounded-xl font-bold transition-all active:scale-95 shadow-lg min-w-[120px]">開始</button>
-                                    <button id="lapBtn" onclick="recordLap()" class="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl font-bold transition-all active:scale-95 shadow-lg min-w-[120px] pro-only">分圈</button>
-                                    <button id="resetBtn" onclick="resetTimer()" class="bg-slate-500 hover:bg-slate-400 text-white px-8 py-3 rounded-xl font-bold transition-all active:scale-95 shadow-lg">歸零</button>
-                                </div>
-                                <div id="recManualButtons" class="flex flex-wrap justify-center gap-3 w-full">
-                                    <button id="recStartBtn" onclick="startRecording()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-2 rounded-xl font-bold shadow-lg disabled:opacity-30">啟動錄影</button>
-                                    <button id="recStopBtn" onclick="stopRecording()" disabled class="bg-red-600 hover:bg-red-500 text-white px-8 py-2 rounded-xl font-bold shadow-lg disabled:opacity-30">停止錄影</button>
-                                </div>
-                            </div>
-
-                            <!-- 同步控制項 -->
-                            <div id="syncControls" class="hidden flex flex-wrap justify-center gap-4 w-full">
-                                <button id="syncStartBtn" onclick="syncStart()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-10 py-4 rounded-xl font-bold text-lg shadow-lg min-w-[200px] disabled:opacity-30">同步開始</button>
-                                <button id="syncStopBtn" onclick="syncStop()" disabled class="bg-red-600 hover:bg-red-500 text-white px-10 py-4 rounded-xl font-bold text-lg shadow-lg min-w-[200px] disabled:opacity-30">停止儲存</button>
-                            </div>
-
-                            <!-- 設定開關區：始終可見 -->
-                            <div id="displayQuickSettings" class="mt-2 flex flex-wrap justify-center items-center gap-4 transition-all">
-                                <div id="simpleDisplayConfig" class="flex items-center gap-2">
-                                    <span class="text-xs opacity-60">顯示模式：</span>
-                                    <select id="sw_mode_simple" onchange="syncSwMode(this.value)" class="bg-slate-700/50 p-1 rounded text-[10px] text-white border border-slate-600 outline-none">
-                                        <option value="always" selected>永遠顯示</option>
-                                        <option value="before">開始前顯示</option>
-                                        <option value="after">結束後顯示</option>
-                                        <option value="never">隱藏</option>
-                                    </select>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <label class="switch"><input type="checkbox" id="syncModeToggle" onchange="toggleSyncMode()"><span class="slider"></span></label>
-                                    <span class="text-xs opacity-60">同步錄製模式</span>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <label class="switch"><input type="checkbox" id="dupProtectionToggle" checked onchange="syncDupMode(this.checked)"><span class="slider"></span></label>
-                                    <span class="text-xs opacity-60">重複保護 (自動編號)</span>
-                                </div>
+                            <div class="grid grid-cols-2 gap-2 mb-2">
+                                <div><label>水平 %</label><input type="range" id="sw_posX" min="5" max="95" value="50" class="w-full"></div>
+                                <div><label>垂直 %</label><input type="range" id="sw_posY" min="5" max="95" value="85" class="w-full"></div>
                             </div>
                         </div>
-                    </div>
-
-                    <div id="lapListContainer" class="w-full mt-6 max-h-32 overflow-y-auto custom-scrollbar border-t border-slate-700/30 pt-4 hidden pro-only">
-                        <table class="w-full text-center text-[11px] font-mono text-white">
-                            <tbody id="lapTableBody"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="card rounded-3xl p-5 flex flex-col w-full">
-                    <h2 class="text-sm font-bold mb-3 flex items-center gap-2 text-blue-400 uppercase">歷史紀錄</h2>
-                    <div id="recordList" class="overflow-y-auto custom-scrollbar space-y-3 max-h-[400px]">
-                        <div class="text-center py-4 opacity-30 italic text-[10px] text-white">尚無紀錄</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 右側專業合成設定 -->
-            <div class="lg:col-span-3 flex flex-col gap-6 pro-only">
-                <div class="card rounded-3xl p-5 flex flex-col gap-3 text-[11px] overflow-y-auto max-h-[850px] custom-scrollbar">
-                    <h2 class="text-sm font-bold text-blue-400 border-b border-slate-700/50 pb-2 uppercase">影像合成設定</h2>
-                    
-                    <div class="config-section">
-                        <span class="config-label">錄製設定 (同步修改)</span>
-                        <div class="flex flex-col gap-2">
-                            <div class="flex items-center gap-3">
-                                <label class="switch"><input type="checkbox" id="syncModeTogglePro" onchange="syncSyncMode(this.checked)"><span class="slider"></span></label>
-                                <span>同步錄製模式</span>
-                            </div>
-                            <div class="flex items-center gap-3">
-                                <label class="switch"><input type="checkbox" id="dupProtectionTogglePro" checked onchange="syncDupMode(this.checked)"><span class="slider"></span></label>
-                                <span>重複保護 (自動編號)</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="config-section">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="config-label text-blue-400">碼表 (加數)</span>
-                            <select id="sw_mode" onchange="syncSwMode(this.value)" class="bg-slate-700 p-1 rounded text-[9px] text-white">
-                                <option value="always" selected>永遠顯示</option>
-                                <option value="before">開始前</option>
-                                <option value="after">結束後</option>
-                                <option value="never">不顯示</option>
+                        <div class="mt-2">
+                            <label>字體風格 (專業模式)</label>
+                            <select id="videoFontSelect" class="w-full bg-slate-700/50 p-1 rounded border border-slate-600 outline-none mt-1 text-white">
+                                <option value="Orbitron">Orbitron</option>
+                                <option value="Courier New">Courier New</option>
+                                <option value="JetBrains Mono">JetBrains Mono</option>
+                                <option value="Arial">Arial</option>
                             </select>
                         </div>
-                        <div class="grid grid-cols-2 gap-2 mb-2">
-                            <div><label>水平 %</label><input type="range" id="sw_posX" min="5" max="95" value="50" class="w-full"></div>
-                            <div><label>垂直 %</label><input type="range" id="sw_posY" min="5" max="95" value="85" class="w-full"></div>
-                        </div>
-                    </div>
-
-                    <div class="mt-2">
-                        <label>字體風格 (專業模式)</label>
-                        <select id="videoFontSelect" class="w-full bg-slate-700/50 p-1 rounded border border-slate-600 outline-none mt-1 text-white">
-                            <option value="Orbitron">Orbitron</option>
-                            <option value="Courier New">Courier New</option>
-                            <option value="JetBrains Mono">JetBrains Mono</option>
-                            <option value="Arial">Arial</option>
-                        </select>
                     </div>
                 </div>
             </div>
@@ -341,14 +382,26 @@
     <div id="playbackModal" class="modal-overlay">
         <div class="modal-content-bg p-6 rounded-3xl max-w-2xl w-full flex flex-col items-center shadow-2xl relative bg-slate-900 border border-slate-700">
             <div class="absolute top-4 right-4 flex gap-2">
-                <button id="modalDownloadBtn" class="text-slate-400 hover:text-blue-400 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                </button>
-                <button onclick="closeModal()" class="text-slate-400 hover:text-red-500">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M6 18L18 6M6 6l12 12" /></svg>
+                <div class="relative group">
+                    <button id="modalDownloadAllBtn" title="全部打包下載 (ZIP)" class="text-slate-400 hover:text-blue-400 transition-colors p-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                    </button>
+                    <div class="absolute top-full right-0 mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl hidden group-hover:flex flex-col p-1 z-50 min-w-[140px]">
+                        <button id="modalDownloadBtn" class="flex items-center gap-2 px-3 py-2 text-[10px] text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition-all text-left">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4" /></svg>
+                            下載合成影片
+                        </button>
+                        <button id="modalDownloadRawBtn" class="flex items-center gap-2 px-3 py-2 text-[10px] text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition-all text-left">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                            下載原始影片
+                        </button>
+                    </div>
+                </div>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-red-500 p-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
             </div>
-            <h3 id="modalTitle" class="text-lg font-bold mb-4 text-white">回放視窗</h3>
+            <h3 id="modalTitle" class="text-lg font-bold mb-4 text-white text-center w-full">回放視窗</h3>
             <video id="modalVideo" controls class="mb-6 shadow-2xl w-full rounded-xl"></video>
             <div id="modalDisplay" class="text-4xl md:text-5xl font-bold mb-2 text-white">
                 <span class="digit">0</span><span class="digit">0</span>
@@ -360,7 +413,7 @@
         </div>
     </div>
 
-    <footer class="text-center py-8 text-slate-500 text-xs">
+    <footer class="text-center py-8 text-slate-500 text-xs hide-in-fs non-fs">
         版權所有 © 2026 <a href="https://pandapanda6666.github.io" target="_blank" class="text-blue-500 hover:underline">PandaPanda的AI日常</a> All Rights Reserved.
     </footer>
 
@@ -373,7 +426,7 @@
         let countdownPresets = JSON.parse(localStorage.getItem('hybridCountdownPresets') || '[{"id":1,"min":1,"sec":0}]');
         let selectedCountdownId = countdownPresets[0]?.id || null;
         let players = []; 
-        let mediaStream, mediaRecorder, recordedChunks = [], currentFacingMode = 'user';
+        let mediaStream, mediaRecorder, rawMediaRecorder, recordedChunks = [], rawRecordedChunks = [], currentFacingMode = 'user';
         let db = null;
         let supportedMimeType = '';
         let canvasStream = null;
@@ -426,7 +479,7 @@
         }
 
         const getSupportedMimeType = () => {
-            const types = ['video/mp4;codecs=h264,aac', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+            const types = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4;codecs=h264,aac', 'video/mp4'];
             for (let type of types) { if (MediaRecorder.isTypeSupported(type)) return type; }
             return '';
         };
@@ -448,10 +501,7 @@
         function setInitialName() {
             const input = document.getElementById('initNameInput');
             const name = input ? input.value.trim() : "";
-            if (!name) {
-                if (input) input.classList.add('border-red-500');
-                return;
-            }
+            if (!name) { if (input) input.classList.add('border-red-500'); return; }
             const titleEl = document.getElementById('mainTitle');
             if (titleEl) titleEl.textContent = name;
             localStorage.setItem('lastHybridTitle', name);
@@ -464,7 +514,7 @@
             const themeClass = Array.from(document.body.classList).find(c => c.startsWith('theme-')) || 'theme-scifi';
             document.body.className = `${themeClass} ${mode}`;
             const simpleCfg = document.getElementById('simpleDisplayConfig');
-            if (simpleCfg) simpleCfg.classList.toggle('hidden', !isSimpleMode);
+            if (simpleCfg) simpleCfg.classList.toggle('hidden', (mode === 'mode-pro'));
         }
         
         function syncSwMode(val) {
@@ -484,7 +534,8 @@
         }
 
         function changeTheme(themeName) { 
-            const currentMode = isSimpleMode ? 'mode-simple' : 'mode-pro';
+            const modeClasses = ['mode-simple', 'mode-pro', 'mode-pure'];
+            const currentMode = modeClasses.find(m => document.body.classList.contains(m)) || 'mode-simple';
             document.body.className = `${themeName} ${currentMode}`; 
         }
 
@@ -495,6 +546,23 @@
             if (syncArea) syncArea.classList.toggle('hidden', !isSync);
             if (proToggle) proToggle.checked = isSync;
             resetTimer();
+        }
+
+        // 修改後的模擬全螢幕功能 (解決 Permissions Policy 問題)
+        function enterPureTimerFullscreen() {
+            const container = document.getElementById('mainTimerContainer');
+            if (container) {
+                container.classList.add('simulated-fs');
+                document.body.style.overflow = 'hidden';
+            }
+        }
+
+        function exitPureTimerFullscreen() {
+            const container = document.getElementById('mainTimerContainer');
+            if (container) {
+                container.classList.remove('simulated-fs');
+                document.body.style.overflow = '';
+            }
         }
 
         function hexToRgba(hex, alphaPercent) {
@@ -513,7 +581,9 @@
             ctx.restore();
 
             let font, swX, swY, swColor, swBorder, swModeActive;
-            if (isSimpleMode) {
+            const currentMode = Array.from(document.body.classList).find(m => m.startsWith('mode-'));
+            
+            if (currentMode === 'mode-simple' || currentMode === 'mode-pure') {
                 const isScifi = document.body.classList.contains('theme-scifi');
                 font = isScifi ? 'Orbitron' : 'sans-serif';
                 swX = w * 0.5; swY = h * 0.85; swColor = isScifi ? '#ffc300' : '#000000'; swBorder = isScifi ? 'rgba(0,0,0,1)' : 'rgba(255,255,255,1)';
@@ -528,7 +598,7 @@
 
             if (swModeActive) drawTextElement({ text: formatTime(elapsedTime).str, x: swX, y: swY, size: h * 0.12, color: swColor, borderColor: swBorder, font: font });
 
-            if (!isSimpleMode) {
+            if (currentMode === 'mode-pro') {
                 const cdMode = getVal('cd_mode', 'never');
                 if (checkVisibility(cdMode)) drawTextElement({ text: formatTime(Math.max(0, countdownRemaining)).str, x: w * (getVal('cd_posX', 50) / 100), y: h * (getVal('cd_posY', 70) / 100), size: h * 0.10, color: hexToRgba('#ef4444', 100), borderColor: hexToRgba('#000000', 100), font: font });
             }
@@ -570,21 +640,12 @@
         function startTimer() {
             if (timerActive) return;
             timerActive = true; 
-            
             const isSync = getChecked('syncModeToggle');
-            if (isSync) {
-                if (!recordingActive) startRecording();
-            } else {
-                // 如果開始計時前沒開錄影，禁用錄影按鈕（除非是同步模式）
-                const recStart = document.getElementById('recStartBtn');
-                if (recStart && !recordingActive) recStart.disabled = true;
-            }
-
+            if (isSync) { if (!recordingActive) startRecording(); }
+            else { const rs = document.getElementById('recStartBtn'); if (rs && !recordingActive) rs.disabled = true; }
             startTime = Date.now() - elapsedTime;
             const disp = document.getElementById('display'); if (disp) disp.classList.remove('finished');
-            const startBtn = document.getElementById('timerStartBtn');
-            if (startBtn && !isSync) startBtn.textContent = "暫停";
-            
+            const startBtn = document.getElementById('timerStartBtn'); if (startBtn && !isSync) startBtn.textContent = "暫停";
             timerInterval = setInterval(() => { 
                 const now = Date.now(); elapsedTime = now - startTime; 
                 countdownRemaining = countdownInitial - elapsedTime; updateDisplayElement(disp, elapsedTime); 
@@ -600,80 +661,92 @@
             if (!timerActive) return;
             timerActive = false; clearInterval(timerInterval);
             const disp = document.getElementById('display'); if (disp) disp.classList.add('finished');
-            const startBtn = document.getElementById('timerStartBtn');
-            if (startBtn && !getChecked('syncModeToggle')) startBtn.textContent = "開始";
-            
-            if (getChecked('syncModeToggle')) {
-                if (recordingActive) stopRecording();
-            } else {
-                // 非同步模式下，如果停止計時且沒在錄影，則主動儲存紀錄
-                if (!recordingActive) {
-                    saveRecord(null);
-                }
-            }
+            const startBtn = document.getElementById('timerStartBtn'); if (startBtn && !getChecked('syncModeToggle')) startBtn.textContent = "開始";
+            if (getChecked('syncModeToggle')) { if (recordingActive) stopRecording(); }
+            else { if (!recordingActive) saveRecord(null); }
         }
 
         function resetTimer() {
             if (timerActive) stopTimer();
             elapsedTime = 0; lastLapMark = 0; laps = []; updateCountdownInitial();
             const disp = document.getElementById('display'); updateDisplayElement(disp, 0); if (disp) disp.classList.remove('finished');
-            const lapBody = document.getElementById('lapTableBody'); if (lapBody) lapBody.innerHTML = ''; 
-            const lapCont = document.getElementById('lapListContainer'); if (lapCont) lapCont.classList.add('hidden');
-            const startBtn = document.getElementById('timerStartBtn'), recStart = document.getElementById('recStartBtn');
-            if (startBtn) startBtn.textContent = "開始";
-            if (recStart) recStart.disabled = false;
+            const lb = document.getElementById('lapTableBody'); if (lb) lb.innerHTML = ''; 
+            const lc = document.getElementById('lapListContainer'); if (lc) lc.classList.add('hidden');
+            const sb = document.getElementById('timerStartBtn'), rs = document.getElementById('recStartBtn');
+            if (sb) sb.textContent = "開始"; if (rs) rs.disabled = false;
         }
 
         function recordLap() {
-            if (!timerActive || isSimpleMode) return;
+            const currentMode = Array.from(document.body.classList).find(m => m.startsWith('mode-'));
+            if (!timerActive || currentMode === 'mode-simple' || currentMode === 'mode-pure') return;
             const now = elapsedTime; laps.push({ time: now - lastLapMark, total: now }); lastLapMark = now; 
-            const lapCont = document.getElementById('lapListContainer'); if (lapCont) lapCont.classList.remove('hidden');
-            const lapBody = document.getElementById('lapTableBody');
-            if (lapBody) lapBody.innerHTML = laps.map((l, i) => `<tr><td class="py-1 opacity-40">${i+1}</td><td class="text-blue-400">${formatTime(l.time).str}</td><td>${formatTime(l.total).str}</td></tr>`).reverse().join('');
+            const lc = document.getElementById('lapListContainer'); if (lc) lc.classList.remove('hidden');
+            const lb = document.getElementById('lapTableBody');
+            if (lb) lb.innerHTML = laps.map((l, i) => `<tr><td class="py-1 opacity-40">${i+1}</td><td class="text-blue-400">${formatTime(l.time).str}</td><td>${formatTime(l.total).str}</td></tr>`).reverse().join('');
         }
 
         function startRecording() {
             if (recordingActive || !mediaStream) return;
-            if (timerActive && !getChecked('syncModeToggle')) return; // 計時中禁開
-
+            if (timerActive && !getChecked('syncModeToggle')) return; 
             recordingActive = true; 
-            const recStatus = document.getElementById('recordingStatus'), recStart = document.getElementById('recStartBtn'), recStop = document.getElementById('recStopBtn');
-            if (recStatus) recStatus.classList.remove('hidden'); if (recStart) recStart.disabled = true; if (recStop) recStop.disabled = false;
+            const rs = document.getElementById('recordingStatus'), rsb = document.getElementById('recStartBtn'), rstb = document.getElementById('recStopBtn');
+            if (rs) rs.classList.remove('hidden'); if (rsb) rsb.disabled = true; if (rstb) rstb.disabled = false;
             
             canvasStream = canvas.captureStream(30); 
-            const audioTracks = mediaStream.getAudioTracks(); if (audioTracks.length > 0) canvasStream.addTrack(audioTracks[0]);
-            recordedChunks = []; mediaRecorder = new MediaRecorder(canvasStream, { videoBitsPerSecond: 2500000, mimeType: supportedMimeType });
+            const audioTracks = mediaStream.getAudioTracks();
+            const combinedStream = new MediaStream([...canvasStream.getVideoTracks()]);
+            if (audioTracks.length > 0) combinedStream.addTrack(audioTracks[0]);
+            
+            recordedChunks = []; 
+            mediaRecorder = new MediaRecorder(combinedStream, { videoBitsPerSecond: 2500000, mimeType: supportedMimeType });
             mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-            mediaRecorder.onstop = async () => {
-                const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || supportedMimeType }); const id = Date.now();
-                const database = await getDB(); const transaction = database.transaction(["videos"], "readwrite");
-                transaction.objectStore("videos").add({ id, data: blob, mimeType: mediaRecorder.mimeType }); saveRecord(id);
+            
+            rawRecordedChunks = [];
+            rawMediaRecorder = new MediaRecorder(mediaStream, { videoBitsPerSecond: 2500000, mimeType: supportedMimeType });
+            rawMediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) rawRecordedChunks.push(e.data); };
+
+            let recordersDone = 0;
+            const checkDone = async () => {
+                recordersDone++;
+                if (recordersDone === 2) {
+                    const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || supportedMimeType });
+                    const rawBlob = new Blob(rawRecordedChunks, { type: rawMediaRecorder.mimeType || supportedMimeType });
+                    const id = Date.now();
+                    const database = await getDB();
+                    const transaction = database.transaction(["videos"], "readwrite");
+                    transaction.objectStore("videos").add({ id, data: blob, rawData: rawBlob, mimeType: mediaRecorder.mimeType }); 
+                    saveRecord(id);
+                }
             };
+            mediaRecorder.onstop = checkDone;
+            rawMediaRecorder.onstop = checkDone;
             mediaRecorder.start(1000);
+            rawMediaRecorder.start(1000);
         }
 
         function stopRecording() {
             if (!recordingActive) return;
             recordingActive = false; 
-            const recStatus = document.getElementById('recordingStatus'), recStart = document.getElementById('recStartBtn'), recStop = document.getElementById('recStopBtn');
-            if (recStatus) recStatus.classList.add('hidden'); if (recStart && !timerActive) recStart.disabled = false; if (recStop) recStop.disabled = true;
+            const rs = document.getElementById('recordingStatus'), rsb = document.getElementById('recStartBtn'), rstb = document.getElementById('recStopBtn');
+            if (rs) rs.classList.add('hidden'); if (rsb && !timerActive) rsb.disabled = false; if (rstb) rstb.disabled = true;
             if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+            if (rawMediaRecorder && rawMediaRecorder.state !== "inactive") rawMediaRecorder.stop();
         }
 
-        function syncStart() { resetTimer(); startTimer(); const sb = document.getElementById('syncStartBtn'), spb = document.getElementById('syncStopBtn'); if (sb) sb.disabled = true; if (spb) spb.disabled = false; }
-        function syncStop() { const sb = document.getElementById('syncStartBtn'), spb = document.getElementById('syncStopBtn'); if (sb) sb.disabled = false; if (spb) spb.disabled = true; stopTimer(); }
+        function syncStart() { resetTimer(); startTimer(); const b1 = document.getElementById('syncStartBtn'), b2 = document.getElementById('syncStopBtn'); if (b1) b1.disabled = true; if (b2) b2.disabled = false; }
+        function syncStop() { const b1 = document.getElementById('syncStartBtn'), b2 = document.getElementById('syncStopBtn'); if (b1) b1.disabled = false; if (b2) b2.disabled = true; stopTimer(); }
         function switchCamera() { if (recordingActive) return; currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user'; initCamera(); }
         function updateDisplayElement(el, time) { if (!el) return; const t = formatTime(time); el.innerHTML = `<span class="digit">${t.mm}</span><span class="separator">:</span><span class="digit">${t.ss}</span><span class="separator">.</span><span class="digit">${t.ms}</span>`; }
 
         function saveRecord(id) {
-            const titleEl = document.getElementById('mainTitle'), isProtected = getChecked('dupProtectionToggle');
+            const titleEl = document.getElementById('mainTitle'), isProt = getChecked('dupProtectionToggle');
             const baseName = titleEl ? titleEl.textContent.trim() : "紀錄";
-            const finalName = getUniqueName(baseName || "紀錄", isProtected);
+            const finalName = getUniqueName(baseName || "紀錄", isProt);
             const t = formatTime(elapsedTime); 
             const record = { id: id || Date.now(), name: finalName, timeStr: t.str, timestamp: new Date().toLocaleString(), hasVideo: !!id, players: JSON.parse(JSON.stringify(players)) };
             savedRecords.unshift(record); localStorage.setItem('hybridStopwatchRecords', JSON.stringify(savedRecords)); renderRecords();
             if (titleEl) {
-                const nextName = getUniqueName(baseName || "紀錄", isProtected);
+                const nextName = getUniqueName(baseName || "紀錄", isProt);
                 titleEl.textContent = nextName; localStorage.setItem('lastHybridTitle', nextName);
             }
         }
@@ -698,19 +771,35 @@
             const record = savedRecords.find(r => r.id === id); if (!record || !record.id) return;
             const database = await getDB();
             if (!record.hasVideo) {
-                document.getElementById('modalTitle').textContent = record.name + " (文字紀錄)";
-                document.getElementById('modalVideo').style.display = 'none';
-                document.getElementById('playbackModal').style.display = 'flex';
+                const mt = document.getElementById('modalTitle'), mv = document.getElementById('modalVideo'), pb = document.getElementById('playbackModal');
+                if (mt) mt.textContent = record.name + " (文字紀錄)";
+                if (mv) mv.style.display = 'none';
+                if (pb) pb.style.display = 'flex';
                 updateDisplayElement(document.getElementById('modalDisplay'), elapsedTime);
                 return;
             }
-            document.getElementById('modalVideo').style.display = 'block';
+            const mv = document.getElementById('modalVideo'); if (mv) mv.style.display = 'block';
             const request = database.transaction(["videos"], "readonly").objectStore("videos").get(id);
             request.onsuccess = () => {
                 if (request.result) {
-                    const url = URL.createObjectURL(request.result.data), mv = document.getElementById('modalVideo'), mt = document.getElementById('modalTitle'), pb = document.getElementById('playbackModal'); 
+                    const blob = request.result.data, rawBlob = request.result.rawData;
+                    const url = URL.createObjectURL(blob), rawUrl = rawBlob ? URL.createObjectURL(rawBlob) : null;
+                    const mt = document.getElementById('modalTitle'), pb = document.getElementById('playbackModal'); 
                     if (mv) mv.src = url; if (mt) mt.textContent = record.name; if (pb) pb.style.display = 'flex';
-                    if (mv) { mv.ontimeupdate = () => updateDisplayElement(document.getElementById('modalDisplay'), mv.currentTime * 1000); const mdb = document.getElementById('modalDownloadBtn'); if (mdb) mdb.onclick = () => { const a = document.createElement('a'); a.href = url; a.download = `${record.name}.mp4`; a.click(); }; mv.play(); }
+                    if (mv) {
+                        mv.ontimeupdate = () => updateDisplayElement(document.getElementById('modalDisplay'), mv.currentTime * 1000);
+                        const ext = supportedMimeType.includes('mp4') ? '.mp4' : '.webm';
+                        const triggerDown = (u, suf) => { const a = document.createElement('a'); a.href = u; a.download = `${record.name}${suf}${ext}`; a.click(); };
+                        const mdA = document.getElementById('modalDownloadAllBtn');
+                        if (mdA) mdA.onclick = async () => {
+                            const zip = new JSZip(); zip.file(`${record.name}_合成${ext}`, blob);
+                            if (rawBlob) zip.file(`${record.name}_原始${ext}`, rawBlob);
+                            zip.generateAsync({type:"blob"}).then(c => { const a = document.createElement('a'); a.href = URL.createObjectURL(c); a.download = `${record.name}_影片包.zip`; a.click(); });
+                        };
+                        const mdC = document.getElementById('modalDownloadBtn'); if (mdC) mdC.onclick = (e) => { e.stopPropagation(); triggerDown(url, "_合成"); };
+                        const mdR = document.getElementById('modalDownloadRawBtn'); if (mdR) { if (rawUrl) { mdR.style.display = 'flex'; mdR.onclick = (e) => { e.stopPropagation(); triggerDown(rawUrl, "_原始"); }; } else mdR.style.display = 'none'; }
+                        mv.play();
+                    }
                 }
             };
         }
