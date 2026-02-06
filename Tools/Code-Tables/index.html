@@ -35,9 +35,22 @@
             justify-content: center;
             align-items: center;
             width: 100%;
+            font-variant-numeric: tabular-nums;
         }
-        .digit { display: inline-block; text-align: center; min-width: 1.1ch; }
-        .separator { display: inline-block; text-align: center; min-width: 0.5ch; }
+        /* 介面數字間距：86% */
+        .digit { 
+            display: inline-flex; 
+            justify-content: center; 
+            align-items: center;
+            min-width: 0.86em; 
+            text-align: center;
+        }
+        /* 介面符號間距：57% */
+        .separator { 
+            display: inline-flex; 
+            justify-content: center;
+            min-width: 0.57em; 
+        }
 
         body.theme-scifi {
             background-color: #000814;
@@ -57,15 +70,13 @@
             font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
         }
         body.theme-original .card { background: white; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
-        body.theme-original #display, body.theme-original #modalDisplay { font-family: 'Courier New', monospace; color: #0f172a; text-shadow: none; }
+        body.theme-original #display, body.theme-original #modalDisplay { font-family: 'JetBrains Mono', monospace; color: #0f172a; text-shadow: none; }
         body.theme-original .mode-select { color: #1e293b; background: white; border: 1px solid #cbd5e1; }
 
-        /* 專業/簡易模式隱藏邏輯 */
         body.mode-simple .pro-only { display: none !important; }
         body.mode-simple .main-grid { grid-template-columns: 1fr !important; }
         body.mode-simple .main-container { max-width: 800px !important; }
 
-        /* 純碼表模式邏輯 */
         body.mode-pure .pro-only, 
         body.mode-pure #monitorWrapper, 
         body.mode-pure #lapListContainer,
@@ -94,7 +105,6 @@
             width: 12px; height: 12px; background-color: #ef4444; border-radius: 50%;
             display: inline-block; margin-right: 8px; animation: blink 1s infinite;
         }
-        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }
 
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -137,7 +147,7 @@
             background: rgba(239, 68, 68, 0.2);
         }
 
-        /* 模擬全螢幕樣式 (模擬 requestFullscreen 以避開 Permissions Policy) */
+        /* 模擬全螢幕樣式修正 */
         .simulated-fs {
             position: fixed !important;
             top: 0 !important;
@@ -152,10 +162,14 @@
             align-items: center !important;
             margin: 0 !important;
             padding: 20px !important;
+            overflow: hidden !important;
+            border: 1px solid #ffc300 !important;
+            box-sizing: border-box !important;
         }
         .simulated-fs #display {
-            font-size: 18vw !important;
+            /* 移除固定的 min 限制，讓 JS 完全控制 */
             margin-bottom: 2rem !important;
+            white-space: nowrap !important;
         }
         .simulated-fs .hide-in-fs {
             display: none !important;
@@ -166,7 +180,7 @@
 </head>
 <body class="theme-scifi mode-simple">
 
-    <!-- 啟動強制輸入名稱遮罩 -->
+    <!-- 啟動名稱遮罩 -->
     <div id="startupModal" class="modal-overlay">
         <div class="card p-8 rounded-3xl max-w-sm w-full flex flex-col items-center shadow-2xl bg-slate-900 border border-blue-500">
             <h2 class="text-xl font-bold mb-4 text-blue-400">請設定名稱</h2>
@@ -197,7 +211,6 @@
 
     <div class="main-container max-w-[1400px] w-full flex flex-col items-center gap-6 mt-10 mb-20 transition-all">
         
-        <!-- 全螢幕切換容器 -->
         <div id="mainTimerContainer" class="w-full flex flex-col items-center transition-all">
             
             <div class="text-center">
@@ -232,14 +245,12 @@
                                 <input type="number" id="inputSeconds" value="0" min="0" max="59" class="score-input w-full p-2 rounded text-center text-xs text-white bg-slate-800" placeholder="秒">
                                 <button onclick="addCountdownPreset()" class="bg-red-600 text-white px-3 py-2 rounded text-xs font-bold">+</button>
                             </div>
-                            <div class="flex flex-col gap-1 mt-1">
-                                <div class="flex items-center gap-2">
-                                    <label class="switch"><input type="checkbox" id="autoStopAtZero" checked><span class="slider"></span></label>
-                                    <span class="text-[10px] opacity-70">時間到自動停止</span>
-                                </div>
+                            <div class="flex items-center gap-2 mt-1">
+                                <label class="switch"><input type="checkbox" id="autoStopAtZero" checked><span class="slider"></span></label>
+                                <span class="text-[10px] opacity-70">時間到自動停止</span>
                             </div>
-                            <div id="countdownPresetsList" class="flex flex-col gap-2 mt-2 max-h-40 overflow-y-auto custom-scrollbar"></div>
                         </div>
+                        <div id="countdownPresetsList" class="flex flex-col gap-2 mt-2 max-h-40 overflow-y-auto custom-scrollbar"></div>
                     </div>
                 </div>
 
@@ -258,8 +269,9 @@
                             <video id="videoPreview" autoplay muted playsinline></video>
                         </div>
 
-                        <div class="w-full flex flex-col items-center relative">
-                            <div id="display" class="text-6xl md:text-7xl font-bold mb-8 text-white transition-all">
+                        <!-- 碼表顯示區 -->
+                        <div class="w-full flex flex-col items-center relative overflow-hidden">
+                            <div id="display" class="font-bold mb-8 text-white transition-all flex justify-center items-center">
                                 <span class="digit">0</span><span class="digit">0</span>
                                 <span class="separator">:</span>
                                 <span class="digit">0</span><span class="digit">0</span>
@@ -267,7 +279,7 @@
                                 <span class="digit">0</span><span class="digit">0</span><span class="digit">0</span>
                             </div>
                             <div class="absolute -top-4 -right-4 non-fs hide-in-fs">
-                                <button onclick="enterPureTimerFullscreen()" class="p-2 bg-slate-800/50 hover:bg-blue-600 rounded-full text-white transition-all shadow-lg" title="模擬全螢幕">
+                                <button onclick="enterPureTimerFullscreen()" class="p-2 bg-slate-800/50 hover:bg-blue-600 rounded-full text-white transition-all shadow-lg" title="全螢幕模式">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" /></svg>
                                 </button>
                             </div>
@@ -292,6 +304,7 @@
                                     <button id="syncStopBtn" onclick="syncStop()" disabled class="bg-red-600 hover:bg-red-500 text-white px-10 py-4 rounded-xl font-bold text-lg shadow-lg min-w-[200px] disabled:opacity-30">停止儲存</button>
                                 </div>
 
+                                <!-- 快速設定區：預設改為 95% -->
                                 <div id="displayQuickSettings" class="mt-2 flex flex-wrap justify-center items-center gap-4 transition-all hide-in-fs">
                                     <div id="simpleDisplayConfig" class="flex items-center gap-2">
                                         <span class="text-xs opacity-60">顯示模式：</span>
@@ -301,6 +314,11 @@
                                             <option value="after">結束後顯示</option>
                                             <option value="never">隱藏</option>
                                         </select>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs opacity-60">碼表大小 (%)：</span>
+                                        <input type="range" id="sw_uiScale" min="10" max="100" value="95" class="w-24" oninput="updateUIScale(this.value)">
+                                        <span id="uiScaleVal" class="text-[10px] font-bold">95%</span>
                                     </div>
                                     <div class="flex items-center gap-2">
                                         <label class="switch"><input type="checkbox" id="syncModeToggle" onchange="toggleSyncMode()"><span class="slider"></span></label>
@@ -320,8 +338,7 @@
                             </table>
                         </div>
                         
-                        <!-- 退出全螢幕按鈕 -->
-                        <button id="exitFullscreenBtn" onclick="exitPureTimerFullscreen()" class="fixed top-8 right-8 p-3 bg-red-600/50 hover:bg-red-600 text-white rounded-xl font-bold transition-all z-[1000]">退出全螢幕</button>
+                        <button id="exitFullscreenBtn" onclick="exitPureTimerFullscreen()" class="fixed top-8 right-8 p-4 bg-red-600/70 hover:bg-red-600 text-white rounded-2xl font-bold transition-all z-[10000] shadow-2xl">退出全螢幕</button>
                     </div>
 
                     <div class="card rounded-3xl p-5 flex flex-col w-full hide-in-fs">
@@ -442,12 +459,7 @@
         const getChecked = (id, def = false) => document.getElementById(id)?.checked || def;
 
         async function getDB() {
-            if (db) {
-                try {
-                    db.transaction(["videos"], "readonly");
-                    return db;
-                } catch(e) { db = null; }
-            }
+            if (db) { try { db.transaction(["videos"], "readonly"); return db; } catch(e) { db = null; } }
             return new Promise((resolve, reject) => {
                 const request = indexedDB.open("HybridStopwatchDB", 1);
                 request.onupgradeneeded = (e) => {
@@ -496,6 +508,9 @@
             requestAnimationFrame(drawMergedFrame);
             const startup = document.getElementById('startupModal');
             if (startup) startup.style.display = 'flex';
+            // 初始化大小計算預設為 95%
+            updateUIScale(95);
+            window.addEventListener('resize', () => updateUIScale(getVal('sw_uiScale', 95)));
         };
 
         function setInitialName() {
@@ -515,6 +530,7 @@
             document.body.className = `${themeClass} ${mode}`;
             const simpleCfg = document.getElementById('simpleDisplayConfig');
             if (simpleCfg) simpleCfg.classList.toggle('hidden', (mode === 'mode-pro'));
+            setTimeout(() => updateUIScale(getVal('sw_uiScale', 95)), 50);
         }
         
         function syncSwMode(val) {
@@ -548,12 +564,12 @@
             resetTimer();
         }
 
-        // 修改後的模擬全螢幕功能 (解決 Permissions Policy 問題)
         function enterPureTimerFullscreen() {
             const container = document.getElementById('mainTimerContainer');
             if (container) {
                 container.classList.add('simulated-fs');
                 document.body.style.overflow = 'hidden';
+                updateUIScale(getVal('sw_uiScale', 95));
             }
         }
 
@@ -562,6 +578,32 @@
             if (container) {
                 container.classList.remove('simulated-fs');
                 document.body.style.overflow = '';
+                updateUIScale(getVal('sw_uiScale', 95));
+            }
+        }
+
+        function updateUIScale(percent) {
+            const ratio = percent / 100;
+            const uiLabel = document.getElementById('uiScaleVal');
+            if (uiLabel) uiLabel.textContent = percent + '%';
+            
+            const display = document.getElementById('display');
+            if (!display) return;
+            const container = display.parentElement;
+            if (!container) return;
+            const containerWidth = container.offsetWidth || window.innerWidth;
+            
+            // 估算整串碼表寬度比例
+            const calculatedFontSize = (containerWidth * ratio) / 7.16;
+            
+            // 全螢幕下增加高度安全檢查
+            const isFS = container.closest('.simulated-fs');
+            if (isFS) {
+                const containerHeight = window.innerHeight * 0.8;
+                const heightLimit = containerHeight / 1.2;
+                display.style.fontSize = Math.min(calculatedFontSize, heightLimit) + 'px';
+            } else {
+                display.style.fontSize = calculatedFontSize + 'px';
             }
         }
 
@@ -585,7 +627,7 @@
             
             if (currentMode === 'mode-simple' || currentMode === 'mode-pure') {
                 const isScifi = document.body.classList.contains('theme-scifi');
-                font = isScifi ? 'Orbitron' : 'sans-serif';
+                font = isScifi ? 'Orbitron' : 'JetBrains Mono';
                 swX = w * 0.5; swY = h * 0.85; swColor = isScifi ? '#ffc300' : '#000000'; swBorder = isScifi ? 'rgba(0,0,0,1)' : 'rgba(255,255,255,1)';
                 swModeActive = checkVisibility(getVal('sw_mode_simple', 'always'));
             } else {
@@ -596,13 +638,24 @@
                 swModeActive = checkVisibility(getVal('sw_mode', 'always'));
             }
 
-            if (swModeActive) drawTextElement({ text: formatTime(elapsedTime).str, x: swX, y: swY, size: h * 0.12, color: swColor, borderColor: swBorder, font: font });
-
-            if (currentMode === 'mode-pro') {
-                const cdMode = getVal('cd_mode', 'never');
-                if (checkVisibility(cdMode)) drawTextElement({ text: formatTime(Math.max(0, countdownRemaining)).str, x: w * (getVal('cd_posX', 50) / 100), y: h * (getVal('cd_posY', 70) / 100), size: h * 0.10, color: hexToRgba('#ef4444', 100), borderColor: hexToRgba('#000000', 100), font: font });
+            if (swModeActive) {
+                drawMonospacedText({ text: formatTime(elapsedTime).str, x: swX, y: swY, size: h * 0.12, color: swColor, borderColor: swBorder, font: font, digitRatio: 0.86, sepRatio: 0.57 });
             }
             requestAnimationFrame(drawMergedFrame);
+        }
+
+        function drawMonospacedText({text, x, y, size, color, borderColor, font, digitRatio, sepRatio}) {
+            ctx.font = `bold ${size}px ${font}, monospace`; ctx.textBaseline = "middle"; ctx.textAlign = "center";
+            const digitW = size * digitRatio, sepW = size * sepRatio;
+            let totalW = 0;
+            for (let char of text) { totalW += (/[0-9]/.test(char) ? digitW : sepW); }
+            let startX = x - (totalW / 2);
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i], charW = (/[0-9]/.test(char) ? digitW : sepW), drawX = startX + (charW / 2);
+                ctx.strokeStyle = borderColor; ctx.lineWidth = Math.max(2, size / 10);
+                ctx.strokeText(char, drawX, y); ctx.fillStyle = color; ctx.fillText(char, drawX, y);
+                startX += charW;
+            }
         }
 
         function checkVisibility(mode) {
@@ -612,14 +665,9 @@
             return timerActive; 
         }
 
-        function drawTextElement({text, x, y, size, color, borderColor, font}) {
-            ctx.font = `bold ${size}px ${font}, monospace`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-            ctx.strokeStyle = borderColor; ctx.lineWidth = Math.max(2, size / 10); ctx.strokeText(text, x, y); ctx.fillStyle = color; ctx.fillText(text, x, y);
-        }
-
         function renderPlayers() {
             const sb = document.getElementById('scoreboard'); if (!sb) return;
-            sb.innerHTML = players.map(p => `<div class="flex items-center gap-2 bg-slate-800/60 p-2 rounded-xl border border-slate-700/50 text-white"><input type="text" value="${p.name}" onchange="updatePlayerName(${p.id}, this.value)" class="score-input flex-grow p-1 rounded outline-none text-[10px] w-16 text-white bg-transparent"><div class="flex items-center gap-1"><button onclick="updateScore(${p.id}, -1)" class="w-6 h-6 flex items-center justify-center bg-slate-700 rounded hover:bg-red-900">-</button><span class="w-8 text-center font-bold text-blue-400 font-mono text-xs">${p.score}</span><button onclick="updateScore(${p.id}, 1)" class="w-6 h-6 flex items-center justify-center bg-slate-700 rounded hover:bg-green-900">+</button></div><button onclick="removePlayer(${p.id})" class="text-slate-500 hover:text-red-500"><svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M6 18L18 6M6 6l12 12" /></svg></button></div>`).join('');
+            sb.innerHTML = players.map(p => `<div class="flex items-center gap-2 bg-slate-800/60 p-2 rounded-xl border border-slate-700/50 text-white"><input type="text" value="${p.name}" onchange="updatePlayerName(${p.id}, this.value)" class="score-input flex-grow p-1 rounded outline-none text-[10px] w-16 text-white bg-transparent"><div class="flex items-center gap-1"><button onclick="updateScore(${p.id}, -1)" class="w-6 h-6 flex items-center justify-center bg-slate-700 rounded hover:bg-red-900 text-white">-</button><span class="w-8 text-center font-bold text-blue-400 font-mono text-xs">${p.score}</span><button onclick="updateScore(${p.id}, 1)" class="w-6 h-6 flex items-center justify-center bg-slate-700 rounded hover:bg-green-900 text-white">+</button></div><button onclick="removePlayer(${p.id})" class="text-slate-500 hover:text-red-500"><svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M6 18L18 6M6 6l12 12" /></svg></button></div>`).join('');
         }
 
         function addPlayer() { players.push({ id: Date.now(), name: "選手", score: 0 }); renderPlayers(); }
@@ -691,37 +739,25 @@
             recordingActive = true; 
             const rs = document.getElementById('recordingStatus'), rsb = document.getElementById('recStartBtn'), rstb = document.getElementById('recStopBtn');
             if (rs) rs.classList.remove('hidden'); if (rsb) rsb.disabled = true; if (rstb) rstb.disabled = false;
-            
             canvasStream = canvas.captureStream(30); 
             const audioTracks = mediaStream.getAudioTracks();
             const combinedStream = new MediaStream([...canvasStream.getVideoTracks()]);
             if (audioTracks.length > 0) combinedStream.addTrack(audioTracks[0]);
-            
-            recordedChunks = []; 
-            mediaRecorder = new MediaRecorder(combinedStream, { videoBitsPerSecond: 2500000, mimeType: supportedMimeType });
+            recordedChunks = []; mediaRecorder = new MediaRecorder(combinedStream, { videoBitsPerSecond: 2500000, mimeType: supportedMimeType });
             mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-            
-            rawRecordedChunks = [];
-            rawMediaRecorder = new MediaRecorder(mediaStream, { videoBitsPerSecond: 2500000, mimeType: supportedMimeType });
+            rawRecordedChunks = []; rawMediaRecorder = new MediaRecorder(mediaStream, { videoBitsPerSecond: 2500000, mimeType: supportedMimeType });
             rawMediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) rawRecordedChunks.push(e.data); };
-
             let recordersDone = 0;
             const checkDone = async () => {
                 recordersDone++;
                 if (recordersDone === 2) {
-                    const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || supportedMimeType });
-                    const rawBlob = new Blob(rawRecordedChunks, { type: rawMediaRecorder.mimeType || supportedMimeType });
-                    const id = Date.now();
-                    const database = await getDB();
-                    const transaction = database.transaction(["videos"], "readwrite");
-                    transaction.objectStore("videos").add({ id, data: blob, rawData: rawBlob, mimeType: mediaRecorder.mimeType }); 
-                    saveRecord(id);
+                    const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || supportedMimeType }), rawBlob = new Blob(rawRecordedChunks, { type: rawMediaRecorder.mimeType || supportedMimeType });
+                    const id = Date.now(), database = await getDB(), transaction = database.transaction(["videos"], "readwrite");
+                    transaction.objectStore("videos").add({ id, data: blob, rawData: rawBlob, mimeType: mediaRecorder.mimeType }); saveRecord(id);
                 }
             };
-            mediaRecorder.onstop = checkDone;
-            rawMediaRecorder.onstop = checkDone;
-            mediaRecorder.start(1000);
-            rawMediaRecorder.start(1000);
+            mediaRecorder.onstop = checkDone; rawMediaRecorder.onstop = checkDone;
+            mediaRecorder.start(1000); rawMediaRecorder.start(1000);
         }
 
         function stopRecording() {
@@ -736,7 +772,11 @@
         function syncStart() { resetTimer(); startTimer(); const b1 = document.getElementById('syncStartBtn'), b2 = document.getElementById('syncStopBtn'); if (b1) b1.disabled = true; if (b2) b2.disabled = false; }
         function syncStop() { const b1 = document.getElementById('syncStartBtn'), b2 = document.getElementById('syncStopBtn'); if (b1) b1.disabled = false; if (b2) b2.disabled = true; stopTimer(); }
         function switchCamera() { if (recordingActive) return; currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user'; initCamera(); }
-        function updateDisplayElement(el, time) { if (!el) return; const t = formatTime(time); el.innerHTML = `<span class="digit">${t.mm}</span><span class="separator">:</span><span class="digit">${t.ss}</span><span class="separator">.</span><span class="digit">${t.ms}</span>`; }
+
+        function updateDisplayElement(el, time) { 
+            if (!el) return; const t = formatTime(time); 
+            el.innerHTML = `<span class="digit">${t.mm[0]}</span><span class="digit">${t.mm[1]}</span><span class="separator">:</span><span class="digit">${t.ss[0]}</span><span class="digit">${t.ss[1]}</span><span class="separator">.</span><span class="digit">${t.ms[0]}</span><span class="digit">${t.ms[1]}</span><span class="digit">${t.ms[2]}</span>`; 
+        }
 
         function saveRecord(id) {
             const titleEl = document.getElementById('mainTitle'), isProt = getChecked('dupProtectionToggle');
@@ -771,9 +811,9 @@
             const record = savedRecords.find(r => r.id === id); if (!record || !record.id) return;
             const database = await getDB();
             if (!record.hasVideo) {
-                const mt = document.getElementById('modalTitle'), mv = document.getElementById('modalVideo'), pb = document.getElementById('playbackModal');
+                const mt = document.getElementById('modalTitle'), pb = document.getElementById('playbackModal');
                 if (mt) mt.textContent = record.name + " (文字紀錄)";
-                if (mv) mv.style.display = 'none';
+                document.getElementById('modalVideo').style.display = 'none';
                 if (pb) pb.style.display = 'flex';
                 updateDisplayElement(document.getElementById('modalDisplay'), elapsedTime);
                 return;
@@ -782,8 +822,7 @@
             const request = database.transaction(["videos"], "readonly").objectStore("videos").get(id);
             request.onsuccess = () => {
                 if (request.result) {
-                    const blob = request.result.data, rawBlob = request.result.rawData;
-                    const url = URL.createObjectURL(blob), rawUrl = rawBlob ? URL.createObjectURL(rawBlob) : null;
+                    const blob = request.result.data, rawBlob = request.result.rawData, url = URL.createObjectURL(blob), rawUrl = rawBlob ? URL.createObjectURL(rawBlob) : null;
                     const mt = document.getElementById('modalTitle'), pb = document.getElementById('playbackModal'); 
                     if (mv) mv.src = url; if (mt) mt.textContent = record.name; if (pb) pb.style.display = 'flex';
                     if (mv) {
@@ -792,8 +831,7 @@
                         const triggerDown = (u, suf) => { const a = document.createElement('a'); a.href = u; a.download = `${record.name}${suf}${ext}`; a.click(); };
                         const mdA = document.getElementById('modalDownloadAllBtn');
                         if (mdA) mdA.onclick = async () => {
-                            const zip = new JSZip(); zip.file(`${record.name}_合成${ext}`, blob);
-                            if (rawBlob) zip.file(`${record.name}_原始${ext}`, rawBlob);
+                            const zip = new JSZip(); zip.file(`${record.name}_合成${ext}`, blob); if (rawBlob) zip.file(`${record.name}_原始${ext}`, rawBlob);
                             zip.generateAsync({type:"blob"}).then(c => { const a = document.createElement('a'); a.href = URL.createObjectURL(c); a.download = `${record.name}_影片包.zip`; a.click(); });
                         };
                         const mdC = document.getElementById('modalDownloadBtn'); if (mdC) mdC.onclick = (e) => { e.stopPropagation(); triggerDown(url, "_合成"); };
@@ -811,8 +849,8 @@
         function addCountdownPreset() { const m = parseInt(getVal('inputMinutes','0')), s = parseInt(getVal('inputSeconds','0')); if(m===0 && s===0) return; countdownPresets.push({id:Date.now(),min:m,sec:s}); localStorage.setItem('hybridCountdownPresets',JSON.stringify(countdownPresets)); renderCountdownPresets(); }
         function removeCountdownPreset(id) { countdownPresets=countdownPresets.filter(p=>p.id!==id); localStorage.setItem('hybridCountdownPresets',JSON.stringify(countdownPresets)); if(selectedCountdownId===id) selectedCountdownId=countdownPresets[0]?.id||null; renderCountdownPresets(); updateCountdownInitial(); }
         function updateCountdownInitial() { const p=countdownPresets.find(p=>p.id===selectedCountdownId); countdownInitial=p?(p.min*60+p.sec)*1000:0; if(!timerActive) countdownRemaining=countdownInitial; }
-        function saveCurrentConfig() { configProfiles.push({ name: getVal('newConfigName') || "未命名配置", sw: { mode: getVal('sw_mode'), px: getVal('sw_posX'), py: getVal('sw_posY') } }); localStorage.setItem('hybridConfigProfiles', JSON.stringify(configProfiles)); renderConfigList(); }
-        function loadConfig(i) { const c = configProfiles[i]; if (!c) return; const m = document.getElementById('sw_mode'), px = document.getElementById('sw_posX'), py = document.getElementById('sw_posY'); if (m) m.value = c.sw.mode; if (px) px.value = c.sw.px; if (py) py.value = c.sw.py; }
+        function saveCurrentConfig() { configProfiles.push({ name: getVal('newConfigName') || "未命名配置", sw: { mode: getVal('sw_mode'), px: getVal('sw_posX'), py: getVal('sw_posY'), uiScale: getVal('sw_uiScale') } }); localStorage.setItem('hybridConfigProfiles', JSON.stringify(configProfiles)); renderConfigList(); }
+        function loadConfig(i) { const c = configProfiles[i]; if (!c) return; const m = document.getElementById('sw_mode'), px = document.getElementById('sw_posX', 50), py = document.getElementById('sw_posY', 85), sc = document.getElementById('sw_uiScale'); if (m) m.value = c.sw.mode; if (px) px.value = c.sw.px; if (py) py.value = c.sw.py; if (sc && c.sw.uiScale) { sc.value = c.sw.uiScale; updateUIScale(c.sw.uiScale); } }
         function renderConfigList() { const list = document.getElementById('configList'); if (list) list.innerHTML = configProfiles.map((c, i) => `<div onclick="loadConfig(${i})" class="flex justify-between items-center bg-slate-800/40 p-2 rounded border border-slate-700 hover:border-blue-500 cursor-pointer text-white"><span class="text-[10px] truncate text-white">${c.name}</span><button onclick="event.stopPropagation(); configProfiles.splice(${i},1); localStorage.setItem('hybridConfigProfiles', JSON.stringify(configProfiles)); renderConfigList();" class="text-slate-500 hover:text-red-400"><svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M6 18L18 6M6 6l12 12" /></svg></button></div>`).join(''); }
 
         document.addEventListener('keydown', (e) => {
